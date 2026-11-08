@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador UCSM</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .gold-text { color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const CURSOS = [
+            { id: 'vec', nombre: 'CÁLCULO VECTORIAL', cr: 4, crT: 3, crP: 1 },
+            { id: 'topo', nombre: 'TOPOGRAFÍA I', cr: 4, crT: 2, crP: 2 },
+            { id: 'int', nombre: 'CÁLCULO INTEGRAL', cr: 4, crT: 3, crP: 1 },
+            { id: 'cult', nombre: 'CULTURA E IDENTIDAD', cr: 3, crT: 3, crP: 0 },
+            { id: 'arg', nombre: 'ARGUMENTACIÓN Y PENSAMIENTO CRÍTICO', cr: 3, crT: 3, crP: 0 },
+            { id: 'fis', nombre: 'FÍSICA II', cr: 4, crT: 3, crP: 1 }
+        ];
+
+        const TOTAL_CREDITOS = 22;
+
+        const getColor = (nota) => {
+            if (nota === null || nota === undefined || isNaN(nota)) return 'text-slate-400';
+            return nota >= 12 ? 'text-green-400' : 'text-red-400';
+        };
+
+        function App() {
+            const [estudiante, setEstudiante] = useState('1');
+            const [notas, setNotas] = useState({});
+            const [pines, setPines] = useState({});
+
+            useEffect(() => {
+                const savedNotas = localStorage.getItem(`notas_estudiante_${estudiante}`);
+                const savedPines = localStorage.getItem(`pines_estudiante_${estudiante}`);
+                if (savedNotas) setNotas(JSON.parse(savedNotas));
+                else setNotas({});
+                if (savedPines) setPines(JSON.parse(savedPines));
+                else setPines({});
+            }, [estudiante]);
+
+            const updateNota = (cursoId, fase, tipo, valor) => {
+                let val = parseFloat(valor);
+                if (val < 0) val = 0;
+                if (val > 20) val = 20;
+                
+                const newNotas = {
+                    ...notas,
+                    [`${cursoId}_f${fase}_${tipo}`]: isNaN(val) ? '' : val
+                };
+                setNotas(newNotas);
+                localStorage.setItem(`notas_estudiante_${estudiante}`, JSON.stringify(newNotas));
+            };
+
+            const togglePin = (cursoId, fase, tipo) => {
+                const key = `${cursoId}_f${fase}_${tipo}`;
+                const newPines = { ...pines, [key]: !pines[key] };
+                setPines(newPines);
+                localStorage.setItem(`pines_estudiante_${estudiante}`, JSON.stringify(newPines));
+            };
+
+            const limpiarNotas = () => {
+                const notasLimpias = {};
+                Object.keys(notas).forEach(key => {
+                    if (pines[key]) notasLimpias[key] = notas[key];
+                });
+                setNotas(notasLimpias);
+                localStorage.setItem(`notas_estudiante_${estudiante}`, JSON.stringify(notasLimpias));
+            };
+
+            const getNota = (cursoId, fase, tipo) => {
+                const val = notas[`${cursoId}_f${fase}_${tipo}`];
+                return val !== undefined ? val : '';
+            };
+
+            const calcularPromedioFase = (cursoId, fase, crT, crP) => {
+                const nT = parseFloat(getNota(cursoId, fase, 'T')) || 0;
+                if (crP === 0) return Math.round(nT);
+                const nP = parseFloat(getNota(cursoId, fase, 'P')) || 0;
+                const prom = ((nT * crT) + (nP * crP)) / (crT + crP);
+                return Math.round(prom);
+            };
+
+            const calcularPromedioFinalCurso = (cursoId, crT, crP) => {
+                const f1 = calcularPromedioFase(cursoId, 1, crT, crP);
+                const f2 = calcularPromedioFase(cursoId, 2, crT, crP);
+                const f3 = calcularPromedioFase(cursoId, 3, crT, crP);
+                return Math.round((f1 + f2 + f3) / 3);
+            };
+
+            const getSumaTipo = (cursoId, tipo) => {
+                const f1 = parseFloat(getNota(cursoId, 1, tipo)) || 0;
+                const f2 = parseFloat(getNota(cursoId, 2, tipo)) || 0;
+                const f3 = parseFloat(getNota(cursoId, 3, tipo)) || 0;
+                return f1 + f2 + f3;
+            };
+
+            let sumaPonderada = 0;
+            CURSOS.forEach(curso => {
+                const promCurso = calcularPromedioFinalCurso(curso.id, curso.crT, curso.crP);
+                sumaPonderada += promCurso * curso.cr;
+            });
+            const promedioPonderadoFinal = sumaPonderada / TOTAL_CREDITOS;
+
+            return (
+                <div className="max-w-7xl mx-auto pb-10">
+                    <div className="text-center my-8">
+                        <h1 className="text-4xl font-bold tracking-wider text-slate-100 mb-2">SIMULADOR UCSM</h1>
+                        <h2 className="text-xl font-semibold text-slate-300">INGENIERÍA CIVIL</h2>
+                        <h3 className="text-lg text-slate-400">SEMESTRE PAR - 02</h3>
+                    </div>
+
+                    <div className="flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-xl shadow-lg">
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => setEstudiante('1')}
+                                className={`px-6 py-2 rounded-lg font-bold transition-all ${estudiante === '1' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                                Estudiante 1
+                            </button>
+                            <button 
+                                onClick={() => setEstudiante('2')}
+                                className={`px-6 py-2 rounded-lg font-bold transition-all ${estudiante === '2' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                                Estudiante 2
+                            </button>
+                        </div>
+                        <button 
+                            onClick={limpiarNotas}
+                            className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-all">
+                            <i className="fas fa-trash-alt"></i> Limpiar Notas (No fijadas)
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                        {CURSOS.map(curso => {
+                            const promFinal = calcularPromedioFinalCurso(curso.id, curso.crT, curso.crP);
+                            const sumaT = getSumaTipo(curso.id, 'T');
+                            const sumaP = curso.crP > 0 ? getSumaTipo(curso.id, 'P') : 0;
+                            const promT = Math.round(sumaT / 3);
+                            const promP = curso.crP > 0 ? Math.round(sumaP / 3) : 0;
+
+                            return (
+                                <div key={curso.id} className="bg-slate-800 rounded-xl p-6 shadow-xl border border-slate-700">
+                                    <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-blue-400">{curso.nombre}</h3>
+                                            <p className="text-slate-400 text-sm mt-1">Créditos Totales: {curso.cr} | Teoría: {curso.crT} | Práctica: {curso.crP}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Promedio Final</div>
+                                            <div className={`text-4xl font-black ${getColor(promFinal)}`}>
+                                                {promFinal}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                        {[1, 2, 3].map(fase => {
+                                            const promFase = calcularPromedioFase(curso.id, fase, curso.crT, curso.crP);
+                                            return (
+                                                <div key={fase} className="bg-slate-900 rounded-lg p-4 border border-slate-750">
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <h4 className="font-bold text-slate-300">Fase {fase}</h4>
+                                                        <span className={`font-bold text-xl ${getColor(promFase)}`}>{promFase}</span>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-4">
+                                                        <div>
+                                                            <div className="flex justify-between mb-1 text-sm text-slate-400">
+                                                                <span>Teoría</span>
+                                                                <button onClick={() => togglePin(curso.id, fase, 'T')} className={`${pines[`${curso.id}_f${fase}_T`] ? 'text-yellow-400' : 'text-slate-600'} hover:text-yellow-300`}>
+                                                                    <i className="fas fa-thumbtack"></i>
+                                                                </button>
+                                                            </div>
+                                                            <input 
+                                                                type="number" min="0" max="20" step="any"
+                                                                value={getNota(curso.id, fase, 'T')}
+                                                                onChange={(e) => updateNota(curso.id, fase, 'T', e.target.value)}
+                                                                className="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
+                                                            />
+                                                        </div>
+
+                                                        {curso.crP > 0 && (
+                                                            <div>
+                                                                <div className="flex justify-between mb-1 text-sm text-slate-400">
+                                                                    <span>Práctica</span>
+                                                                    <button onClick={() => togglePin(curso.id, fase, 'P')} className={`${pines[`${curso.id}_f${fase}_P`] ? 'text-yellow-400' : 'text-slate-600'} hover:text-yellow-300`}>
+                                                                        <i className="fas fa-thumbtack"></i>
+                                                                    </button>
+                                                                </div>
+                                                                <input 
+                                                                    type="number" min="0" max="20" step="any"
+                                                                    value={getNota(curso.id, fase, 'P')}
+                                                                    onChange={(e) => updateNota(curso.id, fase, 'P', e.target.value)}
+                                                                    className="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white focus:border-blue-500 focus:outline-none"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="bg-slate-900 rounded-lg p-4 flex justify-around text-center text-sm">
+                                        <div>
+                                            <div className="text-slate-400 mb-1">Total Teoría (F1+F2+F3)</div>
+                                            <div className={`font-bold text-lg ${sumaT >= 35 ? 'text-green-400' : 'text-red-400'}`}>
+                                                Suma: {sumaT} <span className="text-slate-500 text-xs ml-1">| Prom: {promT}</span>
+                                            </div>
+                                        </div>
+                                        {curso.crP > 0 && (
+                                            <div>
+                                                <div className="text-slate-400 mb-1">Total Práctica (F1+F2+F3)</div>
+                                                <div className={`font-bold text-lg ${sumaP >= 35 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    Suma: {sumaP} <span className="text-slate-500 text-xs ml-1">| Prom: {promP}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="mt-8 bg-slate-800 rounded-xl p-8 shadow-2xl border-t-4 border-blue-500 text-center sticky bottom-4 z-50">
+                        <h2 className="text-2xl text-slate-300 mb-2">Promedio Ponderado Final</h2>
+                        <div className={`text-6xl font-black mb-4 ${promedioPonderadoFinal >= 14 ? 'gold-text' : (promedioPonderadoFinal >= 12 ? 'text-green-400' : 'text-red-500')}`}>
+                            {promedioPonderadoFinal}
+                        </div>
+                        {promedioPonderadoFinal >= 14 && (
+                            <div className="inline-block bg-yellow-500/20 text-yellow-400 px-4 py-2 rounded-full font-bold text-sm border border-yellow-500/50 uppercase tracking-widest">
+                                <i className="fas fa-star mr-2"></i> Alto Rendimiento
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
